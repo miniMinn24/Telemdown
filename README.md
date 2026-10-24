@@ -32,8 +32,9 @@ No Thirdparty, no sharing your API keys to public bots, no manual efforts... **j
 - API ID, API hash and 2FA password are securely masked while you type
 
 
-> [!Note] Use it responsibly
-> I suggest you to download content you own or have permission to save, **legally.** Though I can't stop you from doing any authorized/unauthorized attempts :3
+> [!Note]
+> **Use it reposibly**. I suggest you to download content you own or have permission to save, **legally.** 
+> Though I can't stop you from doing any authorized/unauthorized attempts :(
 > 
 > Telemdown is not affiliated with or endorsed by Telegram.
 
@@ -61,7 +62,8 @@ Telegram requires every API client to use its own credentials. They are free and
 4. Click **Create application**.
 5. Keep the page open. You need the **App api_id** (a number) and **App api_hash** (a long string) in the first-run setup below.
 
-> [!CAUTION] Keep your API hash private and never post it publicly.
+> [!CAUTION] 
+> **Keep your API hash private and never post it publicly.**
 > If someone else got your Telegram account's API keys, they would be able to control everything.
 
 ### 3. Install Telemdown
