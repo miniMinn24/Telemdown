@@ -1,0 +1,8 @@
+config.toml
+*.session
+*.session-journal
+Downloads/
+*.part
+links.txt
+.venv/
+__pycache__/

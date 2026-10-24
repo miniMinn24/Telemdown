@@ -1,0 +1,3 @@
+telethon>=1.36
+# optional, but makes downloads noticeably faster
+cryptg
