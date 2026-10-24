@@ -118,7 +118,7 @@ git clone https://github.com/miniMinn24/Telemdown.git
 cd telemdown
 
 pip install -r requirements.txt
-python downloader.py
+python Telemdown.py
 ```
 
 On Termux there is no folder picker, so type a path such as `~/storage/downloads/Telemdown` when asked for the download folder.
