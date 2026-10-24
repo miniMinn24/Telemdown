@@ -35,7 +35,7 @@ from telethon.errors import (
 from telethon.tl.types import PeerChannel
 
 PROJECT_NAME = "Telemdown"
-VERSION = "v.1.2.1"
+VERSION = "v.1.0.0"
 REPO_URL = "https://github.com/miniMinn24/Telemdown"
 
 BASE_DIR = Path(__file__).resolve().parent

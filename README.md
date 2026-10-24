@@ -6,7 +6,7 @@ A simple tool that downloads media from **private Telegram channels** you belong
 
 ![Selfhosted](https://img.shields.io/badge/Private-cdd6f4?style=for-the-badge)![Selfhosted](https://img.shields.io/badge/No_Thirdparty-9cc3f7?style=for-the-badge)![Selfhosted](https://img.shields.io/badge/Self_Hosted-5a89c7?style=for-the-badge)
 
-![](https://img.shields.io/github/last-commit/miniMinn24/minimal-waybar?&style=for-the-badge&color=429ddb&logoColor=D9E0EE&labelColor=141a29)
+![](https://img.shields.io/github/last-commit/miniMinn24/Telemdown?&style=for-the-badge&color=429ddb&logoColor=D9E0EE&labelColor=141a29)
 
 </div>
 
@@ -71,23 +71,37 @@ Download or clone this repository, then open a terminal in its folder.
 **Linux / macOS**
 
 ```bash
-git clone https://github.com/miniMinn24/telemdown.git
+# Download the repo
+git clone https://github.com/miniMinn24/Telemdown.git
 cd telemdown
+
+# Create a reliable working environment
 python3 -m venv .venv
 source .venv/bin/activate
+
+# Install required dependencies
 pip install -r requirements.txt
-python3 downloader.py
+
+# Run the tool
+python3 Telemdown.py
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-git clone https://github.com/YOUR-USERNAME/telemdown.git
+# Download the repo
+git clone https://github.com/miniMinn24/Telemdown.git
 cd telemdown
+
+# Create a reliable working environment
 py -m venv .venv
 .venv\Scripts\activate
+
+# Install required dependencies
 pip install -r requirements.txt
-py downloader.py
+
+# Run the tool
+py Telemdown.py
 ```
 
 **Android (Termux)**
@@ -96,9 +110,11 @@ Install [Termux from F-Droid](https://f-droid.org/packages/com.termux/) (the Pla
 
 ```bash
 pkg update && pkg install python git
-termux-setup-storage          # lets Termux save to your phone's storage
-git clone https://github.com/miniMinn24/telemdown.git
+termux-setup-storage # lets Termux save to your phone's storage
+
+git clone https://github.com/miniMinn24/Telemdown.git
 cd telemdown
+
 pip install -r requirements.txt
 python downloader.py
 ```
@@ -107,7 +123,7 @@ On Termux there is no folder picker, so type a path such as `~/storage/downloads
 
 **Optional speed-up:** `pip install cryptg` makes downloads noticeably faster. It is optional, and it may need build tools on some systems.
 
-### 4. First run
+### 4. First run (Fun Part)
 
 The first time you run it, Telemdown asks for:
 
@@ -120,7 +136,7 @@ Your settings are saved to `config.toml` and your login to `session.session`, so
 
 ## Usage
 
-### Download one post
+### Download one post from a private Telegram channel
 
 1. In Telegram, right-click (or long-press) the post and choose **Copy Post Link**.
 2. Paste it at the prompt:
@@ -134,7 +150,7 @@ link › https://t.me/c/1234567890/42
 link ›
 ```
 
-You can paste several links on one line, separated by spaces.
+You can paste several links on one line, **separated by spaces.**
 
 ### Download many posts at once
 
@@ -190,9 +206,13 @@ Edit `config.toml` to change the download folder, or delete it and run Telemdown
 
 ## Security
 
-`config.toml` and `session.session` give full access to your Telegram account. **Treat them like passwords**, never share them, and never commit them to git. The included `.gitignore` already excludes them, along with your downloads and `links.txt`.
+`config.toml` and `session.session` give full access to your Telegram account as this is where your Telegram Account's API keys are stored.
+
+Though they are encrypted, **treat them like passwords**, never share them, and never commit them to git.
+
+For open-source distributers, the included `.gitignore` already excludes them, along with your downloads and `links.txt`.
 
 
 ## License
 
-MIT
+This project is licensed under MIT
