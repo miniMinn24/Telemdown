@@ -10,10 +10,15 @@ A simple tool that downloads media from **private Telegram channels** you belong
 
 </div>
 
-
-
-## About Telemdown
+## About Telemdown ( >-<)/
 Telegram's apps make it awkward to save lots of videos from a private channel. Telemdown uses your own Telegram account (through the official API, via [Telethon](https://github.com/LonamiWebs/Telethon)) so you can just paste links and download.
+
+
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-lightblue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-lightblue.svg)](https://opensource.org/licenses/MIT)
+[![UI Library](https://img.shields.io/badge/UI-Command_Line-lightblue.svg)](https://github.com/TomSchimansky/CustomTkinter)
+[![Platform](https://img.shields.io/badge/Platform-Cross_Platform-lightblue.svg)](https://www.microsoft.com/windows)
+
 
 ![Preview of downloading videos from a private telegram channel](./screenshots/screenshot1.webp)
 
