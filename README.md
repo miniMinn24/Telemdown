@@ -1,8 +1,8 @@
 <div align='center'>
 
-![Telemdown wofi](./screenshots/telemdown_banner.webp)
+![Telemdown wofi](./screenshots/telemdown_banner_chan.webp)
 
-A terminal tool that downloads media from **private/public Telegram channels**.
+A lightweight terminal tool that downloads media from **private/public Telegram channels**.
 
 ![Selfhosted](https://img.shields.io/badge/Private-cdd6f4?style=for-the-badge)![Selfhosted](https://img.shields.io/badge/No_Thirdparty-9cc3f7?style=for-the-badge)![Selfhosted](https://img.shields.io/badge/Self_Hosted-5a89c7?style=for-the-badge)
 

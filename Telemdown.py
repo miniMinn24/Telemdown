@@ -67,7 +67,7 @@ for _stream in (sys.stdout, sys.stderr):
 if sys.stdout.isatty():
     GREEN = "\033[32m"
     RED = "\033[31m"
-    BLUE = "\033[34m"       # Standard Blue
+    BLUE = "\033[34m"       # Standard Blue Color
     LIGHT_BLUE = "\033[94m" # Bright/Light Blue (often better for terminals)
     DIM = "\033[2m"
     RESET = "\033[0m"
