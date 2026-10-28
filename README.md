@@ -10,7 +10,7 @@ A terminal tool that downloads media from **private/public Telegram channels**.
 
 </div>
 
-## About Telemdown ( >-<)/
+## Telemdown - What does it do?
 Telegram's apps make it awkward to save lots of videos from a private channel. Telemdown uses your own Telegram account (through the official API, via [Telethon](https://github.com/LonamiWebs/Telethon)) so you can just paste links and download.
 
 
