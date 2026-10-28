@@ -1,4 +1,5 @@
 config.toml
+config.enc
 *.session
 *.session-journal
 Downloads/

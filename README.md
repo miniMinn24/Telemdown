@@ -2,11 +2,11 @@
 
 ![Telemdown wofi](./screenshots/telemdown_banner.webp)
 
-A simple tool that downloads media from **private Telegram channels** you belong to. 
+A terminal tool that downloads media from **private/public Telegram channels**.
 
 ![Selfhosted](https://img.shields.io/badge/Private-cdd6f4?style=for-the-badge)![Selfhosted](https://img.shields.io/badge/No_Thirdparty-9cc3f7?style=for-the-badge)![Selfhosted](https://img.shields.io/badge/Self_Hosted-5a89c7?style=for-the-badge)
 
-![](https://img.shields.io/github/last-commit/miniMinn24/Telemdown?&style=for-the-badge&color=429ddb&logoColor=D9E0EE&labelColor=141a29)
+![](https://img.shields.io/github/last-commit/miniMinn24/Telemdown?&style=for-the-badge&color=429ddb&logoColor=D9E0EE&labelColor=141a29)![Selfhosted](https://img.shields.io/badge/v1.1.0-151617?style=for-the-badge)
 
 </div>
 
@@ -32,12 +32,14 @@ No Thirdparty, no sharing your API keys to public bots, no manual efforts... **j
 - Works with private channels (`t.me/c/...`), forum topics and public channels
 
 **Useful Features**
+- Encryption on storing your own API credentials
 - Progress bar with speed and size,
 - Auto skips files you already downloaded and removes duplicated links
 - Unfinished downloads are never left behind as broken files
 - Friendly errors instead of crashes + a summary after batches
 - Native GUI folder picker when choosing where to save
 - API ID, API hash and 2FA password are securely masked while you type
+- `h` or `help` for available options.
 
 
 > [!Note]
@@ -55,11 +57,10 @@ No Thirdparty, no sharing your API keys to public bots, no manual efforts... **j
 
 ### 2. Get your Telegram API ID and hash
 
-You might think:
 **Why ask for my own API credentials of my Telegram account?**
 
 Telegram requires every API client to use its own credentials. They are free and take about a minute:
-> *Since this is a self-hosting tool, even the author of this tool won't see your credentials. No worries -3-* 
+> *Since this is a self-hosting tool, you are the only one who can see your own credentials. No worries ;3* 
 
 1. Go to <https://my.telegram.org> and log in with your phone number (use international format, e.g. `+44...`). Telegram sends the login code to your Telegram app.
 
@@ -210,19 +211,19 @@ Edit `config.toml` to change the download folder, or delete it and run Telemdown
 ## Troubleshooting
 
 - **"Can't find that chat"**: you are logged in with an account that is not a member of the channel.
-- **"Telegram rejected your API ID / hash"**: delete `config.toml` and enter them again.
+- **"Telegram rejected your API ID / hash"**: delete `config.toml` (or `config.enc` if you use encryption) and enter them again.
 - **No folder window on Linux**: install `kdialog`, `zenity`, or Python's Tk (`sudo pacman -S tk` on Arch, `sudo apt install python3-tk` on Debian/Ubuntu). You can always type a path in terminal instead.
 - **"Telegram rate limit"**: wait the shown number of seconds, then try again.
 
-## Security
+## API Security
 
 `config.toml` and `session.session` give full access to your Telegram account as this is where your Telegram Account's API keys are stored.
 
 Though they are encrypted, **treat them like passwords**, never share them, and never commit them to git.
 
-For open-source distributers, the included `.gitignore` already excludes them, along with your downloads and `links.txt`.
+For open-source distributers, the included `.gitignore` already excludes them, along with your downloads.
 
 
 ## License
 
-This project is licensed under MIT
+This project is licensed under MIT. You can fork or contribute it on your own repositories!

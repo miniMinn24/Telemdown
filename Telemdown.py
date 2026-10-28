@@ -8,7 +8,10 @@ if sys.version_info < (3, 11):
     )
 
 import asyncio
+import base64
 import codecs
+import getpass
+import inspect
 import json
 import os
 import re
@@ -35,11 +38,12 @@ from telethon.errors import (
 from telethon.tl.types import PeerChannel
 
 PROJECT_NAME = "Telemdown"
-VERSION = "v.1.0.0"
+VERSION = "v.1.1.0"
 REPO_URL = "https://github.com/miniMinn24/Telemdown"
 
 BASE_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = BASE_DIR / "config.toml"
+CONFIG_PATH = BASE_DIR / "config.toml"      # plain-text settings
+ENC_PATH = BASE_DIR / "config.enc"          # passphrase-encrypted settings
 SESSION_PATH = BASE_DIR / "session"  # Telethon creates session.session
 
 # Supported link shapes:
@@ -76,6 +80,10 @@ class UserError(Exception):
 
 
 class Cancelled(Exception):
+    pass
+
+
+class WrongPassphrase(Exception):
     pass
 
 
@@ -137,6 +145,25 @@ def masked_input(prompt: str, mask: str = "*") -> str:
     return "".join(chars)
 
 
+def hidden_input(label: str) -> str:
+    """Prompt with NO echo at all (not even *). Used for passwords and passphrases."""
+    sys.stdout.write(f"{LIGHT_BLUE}[+]{RESET} ")
+    sys.stdout.flush()
+    return getpass.getpass(f"{label} (typing is hidden): ")
+
+
+def ask_yes_no(question: str, default: bool = True) -> bool:
+    hint = "[Y/n]" if default else "[y/N]"
+    while True:
+        answer = input(f"{LIGHT_BLUE}[+]{RESET} {question} {hint}: ").strip().lower()
+        if not answer:
+            return default
+        if answer in ("y", "yes"):
+            return True
+        if answer in ("n", "no"):
+            return False
+
+
 def pick_folder(start: Path) -> str | None:
     """Open a native folder-picker window. None = cancelled or unavailable.
 
@@ -193,18 +220,162 @@ def ask_download_dir() -> str:
     return default_dir
 
 
-def save_config(api_id: int, api_hash: str, download_dir: str) -> None:
-    """Write config.toml as UTF-8 (folder names may be non-ASCII), private to you on Linux/macOS."""
+# Encryption: passphrase -> scrypt -> Fernet (AES-128-CBC + HMAC-SHA256, authenticated).
+# The scrypt settings are stored inside config.enc so they can be raised later.
+KDF_PARAMS = {"n": 2**17, "r": 8, "p": 1}  # ~128 MiB of memory, well under a second
+MIN_PASSPHRASE = 8
+
+
+def have_crypto() -> bool:
+    try:
+        import cryptography  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
+def _derive_key(passphrase: str, salt: bytes, n: int, r: int, p: int) -> bytes:
+    from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
+
+    raw = Scrypt(salt=salt, length=32, n=n, r=r, p=p).derive(passphrase.encode("utf-8"))
+    return base64.urlsafe_b64encode(raw)
+
+
+def encrypt_text(text: str, passphrase: str) -> str:
+    from cryptography.fernet import Fernet
+
+    salt = os.urandom(16)
+    token = Fernet(_derive_key(passphrase, salt, **KDF_PARAMS)).encrypt(text.encode("utf-8"))
+    blob = {
+        "app": "telemdown",
+        "v": 1,
+        "kdf": "scrypt",
+        **KDF_PARAMS,
+        "salt": base64.b64encode(salt).decode(),
+        "token": token.decode(),
+    }
+    return json.dumps(blob, indent=2) + "\n"
+
+
+def decrypt_text(blob_text: str, passphrase: str) -> str:
+    from cryptography.fernet import Fernet, InvalidToken
+
+    damaged = UserError(f"{RED}[error]{RESET} {ENC_PATH.name} is damaged or not a Telemdown file.")
+    try:
+        blob = json.loads(blob_text)
+        salt = base64.b64decode(blob["salt"])
+        n, r, p = int(blob["n"]), int(blob["r"]), int(blob["p"])
+        token = blob["token"].encode()
+    except (ValueError, KeyError, TypeError, AttributeError):
+        raise damaged from None
+    if not (2**14 <= n <= 2**18 and 1 <= r <= 8 and 1 <= p <= 4):  # refuse absurd memory use
+        raise damaged
+    try:
+        return Fernet(_derive_key(passphrase, salt, n, r, p)).decrypt(token).decode("utf-8")
+    except InvalidToken:
+        raise WrongPassphrase from None
+
+
+def write_private(path: Path, text: str) -> None:
+    """Write UTF-8 text readable only by you (Linux/macOS); atomic, never half-written."""
+    tmp = path.with_name(path.name + ".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.replace(tmp, path)
+    path.chmod(0o600)
+
+
+def wipe_file(path: Path) -> None:
+    """Best-effort secure delete: overwrite, then remove (SSDs may still keep old blocks)."""
+    try:
+        size = path.stat().st_size
+        with open(path, "r+b") as f:
+            f.write(b"\0" * size)
+            f.flush()
+            os.fsync(f.fileno())
+    except OSError:
+        pass
+    path.unlink(missing_ok=True)
+
+
+def render_config(api_id: int, api_hash: str, download_dir: str, ask_encrypt: bool = True) -> str:
     text = (
         f"api_id = {api_id}\n"
         f"api_hash = {json.dumps(api_hash, ensure_ascii=False)}\n"
         f"download_dir = {json.dumps(download_dir, ensure_ascii=False)}\n"
     )
-    # Create it with 0600 from the start so it is never briefly readable by others.
-    fd = os.open(CONFIG_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as f:
-        f.write(text)
-    CONFIG_PATH.chmod(0o600)
+    if not ask_encrypt:
+        text += "ask_encrypt = false\n"
+    return text
+
+
+def ask_new_passphrase() -> str:
+    print(f"{DIM}    Pick a passphrase you will remember. If you forget it, the only way back is to "
+          f"delete {ENC_PATH.name} and set up again.{RESET}")
+    while True:
+        first = hidden_input("Choose a passphrase")
+        if len(first) < MIN_PASSPHRASE:
+            print(f"{RED}[error]{RESET} Use at least {MIN_PASSPHRASE} characters.")
+            continue
+        if first == hidden_input("Repeat the passphrase"):
+            return first
+        print(f"{RED}[error]{RESET} They don't match, try again.")
+
+
+def store_new_config(api_id: int, api_hash: str, download_dir: str) -> None:
+    """First-run: save settings, encrypted if the user wants it."""
+    if not have_crypto():
+        print(f"{DIM}Tip: run `pip install cryptography` to be able to encrypt your settings.{RESET}")
+    elif ask_yes_no("Encrypt these settings with a passphrase? (recommended)"):
+        passphrase = ask_new_passphrase()
+        write_private(ENC_PATH, encrypt_text(render_config(api_id, api_hash, download_dir), passphrase))
+        print(f"{GREEN}[success]{RESET} Saved encrypted settings to {ENC_PATH} ;-)\n")
+        return
+    else:
+        write_private(CONFIG_PATH, render_config(api_id, api_hash, download_dir, ask_encrypt=False))
+        print(f"{GREEN}[success]{RESET} Saved to {CONFIG_PATH} ;-)\n")
+        return
+    write_private(CONFIG_PATH, render_config(api_id, api_hash, download_dir))
+    print(f"{GREEN}[success]{RESET} Saved to {CONFIG_PATH} ;-)\n")
+
+
+def offer_encryption(plain_text: str) -> bool:
+    """An existing plain config.toml is found: offer to encrypt it. True if migrated."""
+    if not have_crypto():
+        return False
+    print(f"{LIGHT_BLUE}[!]{RESET} Your API credentials are stored as plain text in {CONFIG_PATH.name}.")
+    answer = input(f"{LIGHT_BLUE}[+]{RESET} Encrypt them now with a passphrase? [Y/n/never]: ").strip().lower()
+    if answer == "never":
+        if "ask_encrypt" not in plain_text:
+            write_private(CONFIG_PATH, plain_text.rstrip("\n") + "\nask_encrypt = false\n")
+        return False
+    if answer not in ("", "y", "yes"):
+        return False
+    passphrase = ask_new_passphrase()
+    blob = encrypt_text(plain_text, passphrase)
+    write_private(ENC_PATH, blob)
+    if decrypt_text(ENC_PATH.read_text(encoding="utf-8"), passphrase) != plain_text:  # verify before deleting
+        ENC_PATH.unlink(missing_ok=True)
+        raise UserError(f"{RED}[error]{RESET} Encryption self-check failed; your plain config was left untouched.")
+    wipe_file(CONFIG_PATH)
+    print(f"{GREEN}[success]{RESET} Encrypted to {ENC_PATH.name} and removed the plain {CONFIG_PATH.name}.\n")
+    return True
+
+
+def unlock_config() -> str:
+    if not have_crypto():
+        sys.exit(f"{RED}[error]{RESET} {ENC_PATH.name} is encrypted but the 'cryptography' package is missing. "
+                 "Run: pip install cryptography")
+    blob = ENC_PATH.read_text(encoding="utf-8")
+    for attempt in range(3):
+        passphrase = hidden_input("Passphrase to unlock your settings")
+        try:
+            return decrypt_text(blob, passphrase)
+        except WrongPassphrase:
+            left = 2 - attempt
+            print(f"{RED}[error]{RESET} Wrong passphrase." + (f" {left} attempt(s) left." if left else ""))
+    sys.exit(f"Forgot it? Delete {ENC_PATH.name} and run Telemdown again to set up from scratch.")
 
 
 def setup_config() -> None:
@@ -231,15 +402,25 @@ def setup_config() -> None:
     api_hash = masked_input(f"{LIGHT_BLUE}[+]{RESET} Your API hash: ").strip()
     download_dir = ask_download_dir()
 
-    save_config(api_id, api_hash, download_dir)
-    print(f"{GREEN}[success]{RESET} Saved to {CONFIG_PATH} ;-)\n")
+    store_new_config(api_id, api_hash, download_dir)
 
 
 def load_config() -> dict:
-    if not CONFIG_PATH.exists():
+    if not ENC_PATH.exists() and not CONFIG_PATH.exists():
         setup_config()
-    with open(CONFIG_PATH, "rb") as f:
-        cfg = tomllib.load(f)
+
+    if ENC_PATH.exists():
+        text, source = unlock_config(), ENC_PATH
+        if CONFIG_PATH.exists():
+            print(f"{RED}[warning]{RESET} A plain {CONFIG_PATH.name} still exists next to {ENC_PATH.name}. "
+                  "Delete it so your API credentials are not left unprotected.")
+    else:
+        text, source = CONFIG_PATH.read_text(encoding="utf-8"), CONFIG_PATH
+        if tomllib.loads(text).get("ask_encrypt", True) and offer_encryption(text):
+            source = ENC_PATH
+
+    cfg = tomllib.loads(text)
+    cfg["config_file"] = source
     folder = Path(cfg["download_dir"]).expanduser()
     # Relative paths (like ./Downloads) are relative to the project, not to
     # whatever folder you happened to launch the script from.
@@ -389,7 +570,7 @@ def normalize_phone(raw: str, ask_cc=ask_country_code) -> str:
 
 def ask_phone() -> str:
     while True:
-        raw = input(f"{LIGHT_BLUE}[+]{RESET} Your phone number (local like 09... or +international): ")
+        raw = input(f"{LIGHT_BLUE}[+]{RESET} Your phone number (international format like +1234...): ")
         phone = normalize_phone(raw)
         if not phone:
             print(f"{RED}[error]{RESET} Please enter a phone number.")
@@ -403,7 +584,7 @@ def ask_phone() -> str:
 
 async def two_factor(client: TelegramClient) -> None:
     while True:
-        password = masked_input(f"{LIGHT_BLUE}[+]{RESET} 2FA password: ")
+        password = hidden_input("2FA password")
         try:
             await client.sign_in(password=password)
             return
@@ -587,10 +768,76 @@ def process(loop, client, cfg: dict, cache: dict, matches: list[re.Match]) -> No
         print()
 
 
+# ---------------------------------------------------------------- help / shutdown
+
+HELP_WORDS = {"h", "help", "?"}
+QUIT_WORDS = {"q", "quit", "exit"}
+
+
+def show_help(cfg: dict) -> None:
+    print(f"""
+{LIGHT_BLUE}{PROJECT_NAME} {VERSION}{RESET}  help
+
+{LIGHT_BLUE}Download{RESET}
+  paste a post link ............ download that post's media
+  paste several links .......... separate them with spaces; they download in order
+  enter a .txt file path ....... download every link in it (one per line, # = comment)
+
+{LIGHT_BLUE}Link formats{RESET}
+  https://t.me/c/<channel>/<message>             private channel
+  https://t.me/c/<channel>/<topic>/<message>     private channel, forum topic
+  https://t.me/<name>/<message>                  public channel
+  (Telegram: right-click a post -> Copy Post Link)
+
+{LIGHT_BLUE}Commands{RESET}
+  h, help, ?          show this menu
+  q, quit, exit       leave {PROJECT_NAME}
+  Ctrl+C              cancel the current download (or the whole batch)
+
+{LIGHT_BLUE}Where things are{RESET}
+  downloads .......... {cfg['download_dir']}
+  settings ........... {cfg.get('config_file', CONFIG_PATH)}
+  more help .......... {REPO_URL}#readme
+""")
+
+
+def shutdown(loop: asyncio.AbstractEventLoop, client) -> None:
+    """Disconnect and close the event loop so that quitting never shows an error."""
+    try:
+        result = client.disconnect()
+        # Telethon performs the disconnect itself (and returns None) when its loop is idle;
+        # otherwise it returns a coroutine that we have to run.
+        if inspect.isawaitable(result):
+            loop.run_until_complete(result)
+    except (Exception, KeyboardInterrupt):
+        pass
+    try:
+        pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+        for task in pending:
+            task.cancel()
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        loop.run_until_complete(loop.shutdown_asyncgens())
+    except (Exception, KeyboardInterrupt):
+        pass
+    finally:
+        try:
+            loop.close()
+        except Exception:
+            pass
+
+
 # ---------------------------------------------------------------- main loop
 
 def main() -> None:
-    cfg = load_config()
+    try:
+        cfg = load_config()
+    except UserError as e:
+        print(e)
+        sys.exit(1)
+    except (KeyboardInterrupt, EOFError):
+        print()
+        sys.exit(0)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
 
@@ -615,7 +862,7 @@ def main() -> None:
 
     print(f"Saving to: {cfg['download_dir']}")
     print("Paste a post link, or the path to a .txt file with one link per line.")
-    print("Ctrl+C cancels a download, q quits.\n")
+    print(f"Type {GREEN}h{RESET} for help, {GREEN}q{RESET} to quit. Ctrl+C cancels a download.\n")
 
     try:
         while True:
@@ -624,8 +871,12 @@ def main() -> None:
             except (EOFError, KeyboardInterrupt):
                 print()
                 break
-            if raw.lower() in {"q", "quit", "exit"}:
+            command = raw.lower()
+            if command in QUIT_WORDS:
                 break
+            if command in HELP_WORDS:
+                show_help(cfg)
+                continue
             if not raw:
                 continue
 
@@ -642,7 +893,7 @@ def main() -> None:
                     print(f"{RED}[error]{RESET} File not found: {raw}\n")
                     continue
                 else:
-                    print(f"{RED}[error]{RESET} That's not a Telegram post link or a file path.\n")
+                    print(f"{RED}[error]{RESET} That's not a Telegram post link or a file path. Type {GREEN}h{RESET} for help.\n")
                     continue
 
             before = len(matches)
@@ -652,8 +903,7 @@ def main() -> None:
 
             process(loop, client, cfg, cache, matches)
     finally:
-        loop.run_until_complete(client.disconnect())
-        loop.close()
+        shutdown(loop, client)
         print("Bye!")
 
 

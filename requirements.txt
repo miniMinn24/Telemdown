@@ -1,3 +1,8 @@
+# Main requirement
 telethon>=1.36
+
+# Security
+cryptography # to encrypt your API credentials
+
 # optional, but makes downloads noticeably faster
 cryptg
